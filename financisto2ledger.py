@@ -200,6 +200,8 @@ for r in c.fetchall():
         flag = ''
     date = time.strftime('%Y-%m-%d', time.localtime(r['datetime'] / 1000))
     note = r['note'] or ''
+    if r['payee']:
+        note = r['payee'] + ' | ' + note
 
     ledger.write('{0}{1} {2}\n'.format(date, flag, note))
     from_account_title = get_account_title(r['from_account_type'], r['from_account'])
