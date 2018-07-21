@@ -7,8 +7,8 @@ import sqlite3
 import time
 import wcwidth
 
-financisto_backup_file = sorted(glob.glob(r'D:\Dropbox\應用程式\Financisto 1 Legacy Test\*.backup'))[-1]
-ledger_file = '.hledger.journal'
+financisto_backup_file = sorted(glob.glob(r'../應用程式/Financisto 1 Legacy Test/*.backup'))[-1]
+ledger_file = 'tib.journal'
 
 tables = {}
 balances = {}
@@ -126,7 +126,7 @@ account_type_map = {
 
 def get_category_title(parent_category_id, parent_category, category_type, category):
     if parent_category_id == None and parent_category == None and category_type == None and category == None:
-        return 'Split'
+        return '[Split]'
 
     title = []
 
@@ -203,7 +203,7 @@ for r in c.fetchall():
     if r['payee']:
         note = r['payee'] + ' | ' + note
 
-    ledger.write('{0}{1} {2}\n'.format(date, flag, note))
+    transaction_header = '{0}{1} {2}\n'.format(date, flag, note)
     from_account_title = get_account_title(r['from_account_type'], r['from_account'])
 
     if r['to_account_type'] == None:
@@ -211,19 +211,30 @@ for r in c.fetchall():
         from_amount   = get_amount(r['from_amount'], r['from_currency'])
         category_title = get_category_title(r['parent_category_id'], r['parent_category'], r['category_type'], r['category'])
 
-        balances[r['from_account']] = balances.get(r['from_account'], 0) + int(r['from_amount'])
+        if category_title == '[Split]':
+            split_tag = ';'
+            from_account_balance = balances.get(r['from_account'], 0) + int(r['from_amount'])
+            ledger.write(';' + transaction_header)
+        else:
+            split_tag = ' '
+            from_account_balance = balances[r['from_account']] = balances.get(r['from_account'], 0) + int(r['from_amount'])
+            ledger.write(transaction_header)
 
-        ledger.write('  {0} {1:>12} {2} = {3:>12} {4}\n'.format(
+        ledger.write('{0} {1} {2:>12} {3} = {4:>12} {5}\n'.format(
+            split_tag,
             from_account_title, from_amount, get_currency(from_currency),
-            get_amount(balances[r['from_account']], r['from_currency']), get_currency(from_currency)))
+            get_amount(from_account_balance, r['from_currency']), get_currency(from_currency)))
 
         if r['original_currency']:
-            ledger.write('  {0} {1:>12} {2} ; {3:12.4f} {4}\n'.format(category_title,
+            ledger.write('{0} {1} {2:>12} {3} ; {4:12.4f} {5}\n'.format(
+                split_tag, category_title,
                 get_amount(-r['original_from_amount'], r['original_currency']), get_currency(r['original_currency']),
                 int(r['from_amount']) / int(r['original_from_amount']), get_currency(r['from_currency'])))
         else:
-            ledger.write('  {0}\n'.format(category_title.strip()))
+            ledger.write('{0} {1}\n'.format(split_tag, category_title.strip()))
     else:
+        ledger.write(transaction_header)
+
         balances[r['from_account']] = balances.get(r['from_account'], 0) + int(r['from_amount'])
         balances[r['to_account']] = balances.get(r['to_account'], 0) + int(r['to_amount'])
 
