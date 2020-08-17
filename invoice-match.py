@@ -5,6 +5,7 @@ import datetime
 import gzip
 import pprint
 import sys
+import unicodedata
 
 invoices = {}
 current_invoice = {}
@@ -61,12 +62,13 @@ for line in bak:
                         i[2].append(('購物袋', '5'))
                     print('Matched ' + invoice_id)
                     matched = True
-                    new_note = ', '.join((' '.join(x) for x in i[2]))
-                    print('Generated note: ' + new_note)
+                    new_note = unicodedata.normalize('NFKC', ', '.join((' '.join(x) for x in i[2])))
                     if not entity.get('note'):
                         entity['note'] = new_note
+                        print('    + ' + new_note)
                     else:
-                        print('Transaction already has note: ' + repr(entity['note']) + ', skipping')
+                        print('      ' + entity['note'])
+                        print('    ! ' + new_note)
                     break
 
             if matched:
