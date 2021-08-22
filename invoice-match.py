@@ -16,7 +16,8 @@ invoice_csv = open(sys.argv[1], 'r', encoding='utf-8')
 def save_invoice():
     global invoices, current_invoice, current_lineitems
     if not current_invoice: return
-    invoices[current_invoice['id']] = [current_invoice['date'], current_invoice['total'], current_lineitems]
+    invoices[current_invoice['id']] = [current_invoice['date'], current_invoice['total'], current_lineitems,
+        current_invoice['carrier']]
     current_invoice = {}
     current_lineitems = []
 
@@ -27,6 +28,7 @@ for l in invoice_csv:
         current_invoice['id'] = f[6]
         current_invoice['date'] = datetime.datetime.strptime(f[3] + ' +0800', '%Y%m%d %z').timestamp()
         current_invoice['total'] = int(f[7])
+        current_invoice['carrier'] = f[1]
     elif f[0] == 'D':
         current_lineitems.append((f[3], f[2]))
 save_invoice()
@@ -57,7 +59,9 @@ for line in bak:
 
             matched = False
             for invoice_id, i in invoices.items():
-                if abs(ts - i[0]) < 93600 and (amount == i[1] or amount == (i[1] + 5)):
+                if (abs(ts - i[0]) < 93600 and (amount == i[1] or amount == (i[1] + 5)) and
+                    (entity['from_account_id'] == '19' if i[3] == '悠遊卡' else True)):
+
                     if amount == i[1] + 5:
                         i[2].append(('購物袋', '5'))
                     print('Matched ' + invoice_id)
@@ -89,5 +93,13 @@ for line in bak:
         f = line.strip().split(':', 1)
         entity[f[0]] = f[1]
 
-print('Remaining invoices:')
+print()
+print('Remaining invoices (%s):' % len(invoices))
+print()
+
+for invoice_id, invoice in invoices.items():
+    invoice[0] = datetime.datetime.fromtimestamp(invoice[0],
+        datetime.timezone(datetime.timedelta(hours=8))
+        ).strftime('%Y-%m-%d %H:%M:%S')
+
 pprint.pprint(invoices)
