@@ -298,7 +298,7 @@ for row in cursor.fetchall():
 $ENTITY:category
 _id:{_id}
 title:{name}
-type:1
+type:{type}
 is_active:1
 $$
 '''.format(**r))
