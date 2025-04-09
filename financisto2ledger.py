@@ -17,13 +17,13 @@ currencies = {}
 def create_db():
     table_schemas = [
         '''CREATE TABLE account ( _id integer primary key autoincrement, title text not null, creation_date long not null, currency_id integer not null, total_amount integer not null default 0 , type text not null default 'CASH', issuer text, number text, is_active boolean not null default 1, is_include_into_totals boolean not null default 1, last_category_id long not null default 0, last_account_id long not null default 0, total_limit integer not null default 0, card_issuer text, closing_day integer not null default 0, payment_day integer not null default 0, note text, last_transaction_date long not null default 0, updated_on long not null, sort_order integer not null default 0)''',
-        '''CREATE TABLE category ( _id integer primary key autoincrement, title text not null, left integer not null default 0, right integer not null default 0 , last_location_id long not null default 0, last_project_id long not null default 0, type integer not null default 0, updated_on long not null, sort_order integer not null default 0)''',
+        '''CREATE TABLE category ( _id integer primary key autoincrement, title text not null, left integer not null default 0, right integer not null default 0 , last_location_id long not null default 0, last_project_id long not null default 0, type integer not null default 0, updated_on long not null, sort_order integer not null default 0, is_active boolean not null default 1)''',
         '''CREATE TABLE currency_exchange_rate ( from_currency_id integer not null, to_currency_id integer not null, rate_date long not null, rate float not null, updated_on long not null, PRIMARY KEY (from_currency_id, to_currency_id, rate_date) )''',
         '''CREATE TABLE locations ( _id integer primary key autoincrement, name text not null, datetime long not null, provider text, title text, accuracy float, latitude double, longitude double, is_payee integer not null default 0, resolved_address text , count integer not null default 0, updated_on long not null, sort_order integer not null default 0)''',
         '''CREATE TABLE transactions ( _id integer primary key autoincrement, from_account_id long not null, to_account_id long not null default 0, category_id long not null default 0, project_id long not null default 0, location_id long not null default 0, note text, from_amount integer not null default 0, to_amount integer not null default 0, datetime long not null, provider text, accuracy float, latitude double, longitude double , payee text, is_template integer not null default 0, template_name text, recurrence text, notification_options text, status text not null default 'UR', attached_picture text, is_ccard_payment integer not null default 0, last_recurrence long not null default 0, payee_id long, parent_id long not null default 0, original_currency_id long not null default 0, original_from_amount long not null default 0, updated_on long not null)''',
         '''CREATE TABLE project ( _id integer primary key autoincrement, title text , is_active boolean not null default 1, updated_on long not null, sort_order integer not null default 0)''',
-        '''CREATE TABLE currency ( _id integer primary key autoincrement, name text not null, title text not null, symbol text not null , is_default integer not null default 0, decimals integer not null default 2, decimal_separator text, group_separator text, symbol_format text not null default 'RS', updated_on long not null, sort_order integer not null default 0)''',
-        '''CREATE TABLE payee ( _id integer primary key autoincrement, title text not null, last_category_id long not null default 0, updated_on long not null, sort_order integer not null default 0)''',
+        '''CREATE TABLE currency ( _id integer primary key autoincrement, name text not null, title text not null, symbol text not null , is_default integer not null default 0, decimals integer not null default 2, decimal_separator text, group_separator text, symbol_format text not null default 'RS', updated_on long not null, sort_order integer not null default 0, update_exchange_rate integer not null default 0, is_active boolean not null default 1)''',
+        '''CREATE TABLE payee ( _id integer primary key autoincrement, title text not null, last_category_id long not null default 0, updated_on long not null, sort_order integer not null default 0, is_active boolean not null default 1)''',
     ]
     c = db.cursor()
     for s in table_schemas:
@@ -56,7 +56,7 @@ def import_backup():
     while 1:
         l = f.readline()
         if   not l: break
-        elif l == '#END\n': break
+        elif l.startswith('#END'): break
         elif l == '$$\n':
             # dirty auto increment for currency exchange rate
             if not entity_id:
@@ -69,6 +69,9 @@ def import_backup():
 
             if entity_type != 'currency_exchange_rate':
                 fields['_id'] = entity_id
+
+            if entity_type == 'sms_template':
+                continue
 
             #for k in fields:
             #    if type(fields[k]) == str:
