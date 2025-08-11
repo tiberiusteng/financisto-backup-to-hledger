@@ -17,10 +17,12 @@ current_lineitems = []
 
 invoice_csv = open(sys.argv[1], 'r', encoding='utf-8')
 
+# if transaction has specified payee, check invoice issuer contains string
 payee_check = {
     3: re.compile('統一超商'),
     4: re.compile('全家便利商店'),
     51: re.compile('萊爾富'),
+    62: re.compile('巨竑綠茶店'),
     301: re.compile('三商家購'),
 }
 
@@ -51,6 +53,7 @@ out = gzip.open(sys.argv[2].replace('.backup', '-invoice.backup'), 'wt', encodin
 entity_type = ''
 entity = {}
 start = False
+matched_count = 0
 
 for line in bak:
     if not start:
@@ -70,37 +73,44 @@ for line in bak:
             ts = int(entity['datetime']) / 1000
 
             matched = False
+            candidates = []
+
             for invoice_id, i in invoices.items():
+                if (abs(ts - i[0]) < 93600 and (entity['from_account_id'] == '19' if i[3] == '悠遊卡' else True)):
+                    candidates.append((invoice_id, i))
 
-                if (abs(ts - i[0]) < 93600 and (amount == i[1] or amount == (i[1] + 5) or amount == (i[1] + 2) or amount == (i[1] + 1) or amount == (i[1] - 5)) and
-                    (entity['from_account_id'] == '19' if i[3] == '悠遊卡' else True)):
+            # first check for exact amount, then check with paid bag (+5, +2, +1) / cup discount (-5)
+            for check_amount in [(0,), (5, 2, 1, -5)]:
+                for invoice_id, i in candidates:
+                    if (amount - i[1]) in check_amount:
+                        payee_id = int(entity['payee_id'])
+                        if payee_id in payee_check:
+                            if not payee_check[payee_id].search(i[4]):
+                                print('payee check %d != %s' % (payee_id, i[4]))
+                                continue
 
-                    payee_id = int(entity['payee_id'])
-                    if payee_id in payee_check:
-                        if not payee_check[payee_id].search(i[4]):
-                            print('payee check %d != %s' % (payee_id, i[4]))
-                            continue
-
-                    if amount == i[1] + 5:
-                        i[2].append(('兩用袋', '5'))
-                    elif amount == i[1] + 2:
-                        i[2].append(('兩用袋', '2'))
-                    elif amount == i[1] + 1:
-                        i[2].append(('兩用袋', '1'))
-                    elif amount == i[1] - 5:
-                        i[2].append(('自帶杯', '-5'))
-                    print('Matched ' + invoice_id)
-                    matched = True
-                    new_note = unicodedata.normalize('NFKC', ', '.join((' '.join(x) for x in i[2])))
-                    if not entity.get('note'):
-                        entity['note'] = new_note
-                        print('    + ' + new_note)
-                    else:
-                        print('      ' + entity['note'])
-                        print('    ! ' + new_note)
-                    break
+                        if amount == i[1] + 5:
+                            i[2].append(('兩用袋', '5'))
+                        elif amount == i[1] + 2:
+                            i[2].append(('兩用袋', '2'))
+                        elif amount == i[1] + 1:
+                            i[2].append(('兩用袋', '1'))
+                        elif amount == i[1] - 5:
+                            i[2].append(('自帶杯', '-5'))
+                        print('Matched ' + invoice_id)
+                        matched = True
+                        new_note = unicodedata.normalize('NFKC', ', '.join((' '.join(x) for x in i[2])))
+                        if not entity.get('note'):
+                            entity['note'] = new_note
+                            print('    + ' + new_note)
+                        else:
+                            print('      ' + entity['note'])
+                            print('    ! ' + new_note)
+                        break
+                if matched: break
 
             if matched:
+                matched_count += 1
                 del invoices[invoice_id]
 
         # output entity
@@ -128,3 +138,6 @@ for invoice_id, invoice in invoices.items():
         ).strftime('%Y-%m-%d %H:%M:%S')
 
 pprint.pprint(invoices)
+
+print()
+print('Matched %d, Remaining %d' % (matched_count, len(invoices)))
